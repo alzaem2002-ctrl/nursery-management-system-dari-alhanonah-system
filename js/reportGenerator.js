@@ -590,6 +590,22 @@
           </div>
           ${renderTranscript(result.transcript)}
         </div>
+        <div class="bg-gray-800 rounded-xl p-4 mt-4">
+          <div class="flex items-center gap-2 mb-3">
+            <i class="fas fa-file-signature text-yellow-400"></i>
+            <h3 class="font-bold">اختيار نوع التقرير</h3>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+            <label for="reportType" class="text-xs text-gray-400">نوع التقرير</label>
+            <select id="reportType" class="bg-gray-900 border border-gray-700 rounded p-2">
+              <option value="meeting">تقرير اجتماع</option>
+            </select>
+            <button id="generateReportBtn" class="bg-yellow-700 hover:bg-yellow-600 px-4 py-2 rounded">
+              إنشاء التقرير
+            </button>
+          </div>
+          <p class="text-xs text-gray-400 mt-2">سيتم إنشاء التقرير بناءً على التفريغ أعلاه.</p>
+        </div>
       </section>
     `;
 
@@ -598,10 +614,18 @@
       renderKeywordsChart(canvas, result.chartsData.keywords.labels, result.chartsData.keywords.values);
     }
 
-    // Load saved draft if exists and source file matches; else use current
-    const saved = loadFromLocalStorage();
-    const report = saved && saved.meta?.sourceFile === result.summary.fileName ? saved : result.meetingReport;
-    renderMeetingReport(report);
+    // Bind generate report button to render after user selects type
+    const btn = document.getElementById('generateReportBtn');
+    btn?.addEventListener('click', () => {
+      const typeSel = document.getElementById('reportType');
+      const selectedType = typeSel && 'value' in typeSel ? typeSel.value : 'meeting';
+      // Currently only meeting report is supported
+      if (selectedType === 'meeting') {
+        const saved = loadFromLocalStorage();
+        const report = saved && saved.meta?.sourceFile === result.summary.fileName ? saved : result.meetingReport;
+        renderMeetingReport(report);
+      }
+    });
   }
 
   window.reportGenerator = { render };
