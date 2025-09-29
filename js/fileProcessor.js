@@ -1,5 +1,5 @@
 (function () {
-  const MAX_SIZE_MB = 500;
+  const MAX_SIZE_MB = 10240;
 
   function validateFile(expectedType, file) {
     if (!file) throw new Error('الرجاء اختيار ملف');
