@@ -46,6 +46,16 @@
         .progress-bar {
             transition: width 0.3s ease;
         }
+        @media print {
+            body { background: #fff !important; color: #000 !important; }
+            .bg-gray-900, .bg-gray-800 { background: #fff !important; }
+            .text-white, .text-gray-400, .text-gray-300 { color: #000 !important; }
+            #localModeNotification, #loadingState, #errorAlert, #successAlert { display: none !important; }
+            button, .no-print, [class*="fa-"] { display: none !important; }
+            input, textarea { border: 1px solid #000 !important; background: #fff !important; color: #000 !important; }
+            a { color: #000 !important; text-decoration: underline; }
+            @page { margin: 12mm; }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white font-sans">
