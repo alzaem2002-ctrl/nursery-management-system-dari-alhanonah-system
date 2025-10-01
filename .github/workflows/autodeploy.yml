@@ -74,8 +74,13 @@ jobs:
           git fetch --prune origin
           git checkout -B main
           git reset --hard origin/main
-          git submodule sync --recursive || true
-          git submodule update --init --recursive || true
+          if [ -f .gitmodules ]; then
+            git submodule sync --recursive || true
+            git submodule update --init --recursive || true
+          else
+            # remove stale submodule config if any
+            git config -l | awk -F= '/^submodule\..*\.url=/{print $1}' | while read -r key; do git config --unset "$key" || true; done
+          fi
 
           if [ -f package-lock.json ]; then npm ci; else npm i; fi
           npm run build || true
