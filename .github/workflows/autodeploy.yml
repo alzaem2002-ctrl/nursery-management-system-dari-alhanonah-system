@@ -7,6 +7,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Validate required secrets
@@ -47,13 +48,26 @@ jobs:
           APP_DIR:  ${{ secrets.DEPLOY_APP_DIR }}
         run: |
           ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes $SSH_USER@$SSH_HOST <<'EOSSH'
-          set -e
+          set -euo pipefail
+          command -v git >/dev/null 2>&1 || { echo "git is not installed on server"; exit 1; }
+          mkdir -p "$APP_DIR"
+          git config --global --add safe.directory "$APP_DIR" || true
           cd "$APP_DIR" || exit 1
 
+          REPO_URL="https://github.com/alzaem2002-ctrl/nursery-management-system-dari-alhanonah-system.git"
           if [ ! -d .git ]; then
-            git clone https://github.com/alzaem2002-ctrl/nursery-management-system-dari-alhanonah-system.git .
+            if [ "$(ls -A 2>/dev/null | wc -l)" -gt 0 ]; then
+              git init
+              git remote add origin "$REPO_URL" || git remote set-url origin "$REPO_URL"
+            else
+              git clone "$REPO_URL" .
+            fi
+          else
+            git remote get-url origin >/dev/null 2>&1 || git remote add origin "$REPO_URL"
           fi
-          git fetch --all
+
+          git fetch --prune origin
+          git checkout -B main
           git reset --hard origin/main
 
           if [ -f package-lock.json ]; then npm ci; else npm i; fi
