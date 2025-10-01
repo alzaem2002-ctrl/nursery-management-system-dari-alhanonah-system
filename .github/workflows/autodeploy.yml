@@ -9,7 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
       - name: Validate required secrets
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
@@ -69,6 +74,8 @@ jobs:
           git fetch --prune origin
           git checkout -B main
           git reset --hard origin/main
+          git submodule sync --recursive || true
+          git submodule update --init --recursive || true
 
           if [ -f package-lock.json ]; then npm ci; else npm i; fi
           npm run build || true
