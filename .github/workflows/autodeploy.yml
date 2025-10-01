@@ -1,0 +1,43 @@
+name: Auto Deploy (main → server)
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY:  ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+      - name: Deploy via SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          APP_DIR:  ${{ secrets.DEPLOY_APP_DIR }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 $SSH_USER@$SSH_HOST <<'EOSSH'
+          set -e
+          cd "$APP_DIR" || exit 1
+
+          if [ ! -d .git ]; then
+            git clone https://github.com/alzaem2002-ctrl/nursery-management-system-dari-alhanonah-system.git .
+          fi
+          git fetch --all
+          git reset --hard origin/main
+
+          if [ -f package-lock.json ]; then npm ci; else npm i; fi
+          npm run build || true
+
+          pm2 start ecosystem.config.cjs || pm2 restart ecosystem.config.cjs || pm2 restart all
+          pm2 save
+          EOSSH
