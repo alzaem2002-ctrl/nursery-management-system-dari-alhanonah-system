@@ -44,7 +44,10 @@ app.use('/api/*', cors({
 }))
 
 // Serve static files
-app.use('/static/*', serveStatic({ root: './public' }))
+app.use('/static/*', serveStatic({ 
+  root: './public',
+  manifest: {}
+}))
 
 // Serve manifest.json  
 app.get('/manifest.json', (c) => c.text('{}', 200, {'Content-Type': 'application/json'}))
