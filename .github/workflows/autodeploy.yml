@@ -9,6 +9,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate required secrets
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY:  ${{ secrets.SSH_PRIVATE_KEY }}
+          APP_DIR:  ${{ secrets.DEPLOY_APP_DIR }}
+        run: |
+          for v in SSH_HOST SSH_USER SSH_KEY APP_DIR; do
+            if [ -z "${!v}" ]; then
+              echo "Missing required secret: $v"
+              exit 1
+            fi
+          done
       - name: Setup SSH
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
@@ -16,16 +29,24 @@ jobs:
           SSH_KEY:  ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 700 ~/.ssh
+          printf "%s" "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          touch ~/.ssh/known_hosts
+          ssh-keyscan -T 5 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+      - name: Preflight SSH check
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" 'echo ok'
       - name: Deploy via SSH
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           APP_DIR:  ${{ secrets.DEPLOY_APP_DIR }}
         run: |
-          ssh -i ~/.ssh/id_ed25519 $SSH_USER@$SSH_HOST <<'EOSSH'
+          ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes $SSH_USER@$SSH_HOST <<'EOSSH'
           set -e
           cd "$APP_DIR" || exit 1
 
