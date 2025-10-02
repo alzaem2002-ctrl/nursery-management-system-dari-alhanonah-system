@@ -1,84 +1,161 @@
-name: Auto Deploy (main → server)
+name: Auto Deploy
 
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Validate required secrets
         env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_KEY:  ${{ secrets.SSH_PRIVATE_KEY }}
-          APP_DIR:  ${{ secrets.DEPLOY_APP_DIR }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        shell: bash
         run: |
-          for v in SSH_HOST SSH_USER SSH_KEY APP_DIR; do
+          missing=0
+          for v in DEPLOY_KEY DEPLOY_HOST DEPLOY_USER; do
             if [ -z "${!v}" ]; then
-              echo "Missing required secret: $v"
-              exit 1
+              echo "❌ Missing required secret: $v"
+              missing=1
             fi
           done
-      - name: Setup SSH
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          echo "✅ Secrets present"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup SSH for server access
         env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_KEY:  ${{ secrets.SSH_PRIVATE_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        shell: bash
         run: |
           mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          printf "%s" "$SSH_KEY" > ~/.ssh/id_ed25519
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           touch ~/.ssh/known_hosts
-          ssh-keyscan -T 5 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-      - name: Preflight SSH check
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          echo "✅ SSH key and known_hosts configured"
+
+      - name: Verify SSH connectivity (ssh -T)
         env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        shell: bash
         run: |
-          ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" 'echo ok'
-      - name: Deploy via SSH
+          PORT="${DEPLOY_PORT:-22}"
+          set -o pipefail
+          ssh -i ~/.ssh/id_ed25519 -p "$PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -T "$DEPLOY_USER@$DEPLOY_HOST" 'echo "server: $(hostname)" && echo "home: $HOME"' | sed 's/.*/✅ SSH OK: &/'
+
+      - name: Upload source to server (rsync with tar fallback)
         env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          APP_DIR:  ${{ secrets.DEPLOY_APP_DIR }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          APP_DIR: ${{ secrets.APP_DIR }}
+        shell: bash
         run: |
-          ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes $SSH_USER@$SSH_HOST <<'EOSSH'
           set -euo pipefail
-          command -v git >/dev/null 2>&1 || { echo "git is not installed on server"; exit 1; }
-          mkdir -p "$APP_DIR"
-          git config --global --add safe.directory "$APP_DIR" || true
-          cd "$APP_DIR" || exit 1
+          PORT="${DEPLOY_PORT:-22}"
+          APP="${APP_DIR:-/var/www/nursery-system}"
 
-          REPO_URL="https://github.com/alzaem2002-ctrl/nursery-management-system-dari-alhanonah-system.git"
-          if [ ! -d .git ]; then
-            if [ "$(ls -A 2>/dev/null | wc -l)" -gt 0 ]; then
-              git init
-              git remote add origin "$REPO_URL" || git remote set-url origin "$REPO_URL"
-            else
-              git clone "$REPO_URL" .
+          # Ensure destination exists
+          ssh -i ~/.ssh/id_ed25519 -p "$PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$APP'"
+
+          if command -v rsync >/dev/null 2>&1; then
+            echo "📤 Using rsync to upload files"
+            rsync -e "ssh -i ~/.ssh/id_ed25519 -p $PORT" -az --delete \
+              --exclude ".git" \
+              --exclude "node_modules" \
+              --exclude ".github" \
+              --exclude "**/*.log" \
+              ./ "$DEPLOY_USER@$DEPLOY_HOST:$APP/"
+          else
+            echo "📦 rsync not found, falling back to tar over SSH"
+            tar --exclude=".git" --exclude="node_modules" --exclude=".github" -czf - . | \
+              ssh -i ~/.ssh/id_ed25519 -p "$PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$APP' && tar -xzf - -C '$APP'"
+          fi
+          echo "✅ Files uploaded to $APP"
+
+      - name: Install dependencies, build, and restart PM2 on server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          APP_DIR: ${{ secrets.APP_DIR }}
+          NODE_VERSION: ${{ secrets.NODE_VERSION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PORT="${DEPLOY_PORT:-22}"
+          APP="${APP_DIR:-/var/www/nursery-system}"
+          NODE_V="${NODE_VERSION:-18}"
+
+          ssh -i ~/.ssh/id_ed25519 -p "$PORT" -T "$DEPLOY_USER@$DEPLOY_HOST" bash -se <<EOF
+          set -e
+          export DEBIAN_FRONTEND=noninteractive
+
+          # Ensure Node.js available (use nvm if present, otherwise try system node)
+          if [ -s "\$HOME/.nvm/nvm.sh" ]; then
+            . "\$HOME/.nvm/nvm.sh"
+            nvm install $NODE_V >/dev/null 2>&1 || true
+            nvm use $NODE_V >/dev/null 2>&1 || true
+          fi
+
+          cd "$APP"
+
+          # Install pm2 if needed
+          if ! command -v pm2 >/dev/null 2>&1; then
+            npm i -g pm2
+          fi
+
+          # Install deps and build
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+          npm run build --if-present
+
+          # Restart/start app via PM2
+          if [ -f ecosystem.config.cjs ]; then
+            pm2 startOrRestart ecosystem.config.cjs || pm2 restart ecosystem.config.cjs || pm2 start ecosystem.config.cjs
+          else
+            # Fallback: start server.js if PM2 ecosystem file does not exist
+            if [ -f server.js ]; then
+              pm2 start server.js --name nursery-system || pm2 restart nursery-system
             fi
-          else
-            git remote get-url origin >/dev/null 2>&1 || git remote add origin "$REPO_URL"
           fi
+          pm2 save || true
+          EOF
+          echo "✅ Remote install/build/restart complete"
 
-          git fetch --prune origin
-          git checkout -B main
-          git reset --hard origin/main
-          if [ -f .gitmodules ]; then
-            git submodule sync --recursive || true
-            git submodule update --init --recursive || true
-          else
-            # remove stale submodule config if any
-            git config -l | awk -F= '/^submodule\..*\.url=/{print $1}' | while read -r key; do git config --unset "$key" || true; done
-          fi
-
-          if [ -f package-lock.json ]; then npm ci; else npm i; fi
-          npm run build || true
-
-          pm2 start ecosystem.config.cjs || pm2 restart ecosystem.config.cjs || pm2 restart all
-          pm2 save
-          EOSSH
+      - name: Post-deploy health check (optional)
+        if: ${{ secrets.HEALTHCHECK_URL != '' }}
+        env:
+          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+        shell: bash
+        run: |
+          set -e
+          echo "🔎 Checking: $HEALTHCHECK_URL"
+          http_code=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTHCHECK_URL")
+          echo "HTTP $http_code"
+          test "$http_code" -ge 200 -a "$http_code" -lt 400
