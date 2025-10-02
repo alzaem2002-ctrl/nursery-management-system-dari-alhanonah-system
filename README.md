@@ -96,3 +96,7 @@ nursery-management-system/
 ## 🔧 المتطلبات
 - Node.js 14+ 
 - npm أو yarn
+
+---
+
+CI/CD test run: trigger auto-deploy via GitHub Actions

@@ -2,10 +2,10 @@ module.exports = {
   apps: [
     {
       name: 'nursery-system',
-      script: process.env.NODE_ENV === 'production' ? 'server.js' : 'npx',
-      args: process.env.NODE_ENV === 'production' ? '' : 'wrangler pages dev dist --d1=nursery-db --local --ip 0.0.0.0 --port 3000',
+      script: 'server.js',
+      args: '',
       env: {
-        NODE_ENV: 'development',
+        NODE_ENV: 'production',
         PORT: 3000
       },
       watch: false,
