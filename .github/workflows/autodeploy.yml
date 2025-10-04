@@ -1,4 +1,5 @@
 name: Auto Deploy
+
 on:
   push:
     branches: [ "main" ]
@@ -11,53 +12,77 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # 1️⃣ Validate required secrets
       - name: 🧩 Validate Secrets
         run: |
           if [ -z "${{ secrets.DEPLOY_KEY }}" ]; then echo "❌ Missing DEPLOY_KEY"; exit 1; fi
           if [ -z "${{ secrets.DEPLOY_HOST }}" ] || [ -z "${{ secrets.DEPLOY_USER }}" ]; then echo "❌ Missing DEPLOY_HOST or DEPLOY_USER"; exit 1; fi
-          echo "✅ Secrets validation passed"
+          echo "✅ All required secrets are present"
 
+      # 2️⃣ Setup SSH key
       - name: 🔑 Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+          echo "✅ SSH configured successfully"
 
+      # 3️⃣ Test SSH connection
       - name: 🛰️ Test SSH Connection
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "echo 'SSH ✅ Connected'"
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "echo '✅ SSH connection successful on $(hostname)'"
 
+      # 4️⃣ Checkout repository
       - name: 🧱 Checkout Repository
         uses: actions/checkout@v4
 
+      # 5️⃣ Install dependencies
       - name: 🛠️ Install Dependencies
         run: npm ci --verbose
 
+      # 6️⃣ Build project
       - name: 🧩 Build Project
         run: npm run build --if-present --verbose
 
+      # 7️⃣ Deploy to remote server using rsync
       - name: 📦 Deploy via rsync
         run: |
-          rsync -avz --delete --progress -e "ssh -i ~/.ssh/id_rsa" ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/var/www/nursery-system"
+          echo "🚚 Deploying to remote server..."
+          rsync -avz --delete --progress \
+            -e "ssh -i ~/.ssh/id_rsa" \
+            ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/var/www/nursery-system"
+          echo "✅ Deployment completed successfully"
 
+      # 8️⃣ Restart or start PM2 process remotely
       - name: ⚙️ Restart PM2 Service
         run: |
+          echo "♻️ Restarting PM2 service on remote server..."
           ssh -i ~/.ssh/id_rsa "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
             pm2 restart nursery-system || pm2 start /var/www/nursery-system/app.js --name nursery-system;
             pm2 save;
             pm2 list
           "
+          echo "✅ PM2 service restarted successfully"
 
+      # 9️⃣ Post-deployment Health Check
       - name: 🧪 Health Check
         run: |
+          echo "🔍 Running health check on deployed service..."
           ssh -i ~/.ssh/id_rsa "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
-            curl -fs http://localhost:3000/api/health || exit 1
+            curl -fs http://localhost:3000/api/health || (echo '❌ Health check failed'; exit 1)
           "
           echo "✅ Health check passed!"
 
+      # 🔟 Deployment Summary
       - name: 🔍 Deployment Summary
         run: |
-          node -v
-          npm -v
-          ssh -i ~/.ssh/id_rsa "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "pm2 describe nursery-system"
+          echo "=== Deployment Summary ==="
+          echo "📦 Host: ${{ secrets.DEPLOY_HOST }}"
+          echo "👤 User: ${{ secrets.DEPLOY_USER }}"
+          ssh -i ~/.ssh/id_rsa "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
+            pm2 describe nursery-system || echo 'PM2 process not found'
+          "
+          echo "=== End Summary ==="
