@@ -1,170 +1,63 @@
 name: Auto Deploy
-
 on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
 
-concurrency:
-  group: deploy-main
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-
 jobs:
   deploy:
+    name: 🚀 Auto Deploy to Server
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
+
     steps:
-      - name: Validate required secrets
-        env:
-          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-        shell: bash
+      - name: 🧩 Validate Secrets
         run: |
-          missing=0
-          for v in DEPLOY_KEY DEPLOY_HOST DEPLOY_USER; do
-            if [ -z "${!v}" ]; then
-              echo "❌ Missing required secret: $v"
-              missing=1
-            fi
-          done
-          if [ "$missing" -ne 0 ]; then
-            exit 1
-          fi
-          echo "✅ Secrets present"
+          if [ -z "${{ secrets.DEPLOY_KEY }}" ]; then echo "❌ Missing DEPLOY_KEY"; exit 1; fi
+          if [ -z "${{ secrets.DEPLOY_HOST }}" ] || [ -z "${{ secrets.DEPLOY_USER }}" ]; then echo "❌ Missing DEPLOY_HOST or DEPLOY_USER"; exit 1; fi
+          echo "✅ Secrets validation passed"
 
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup SSH for server access
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-        shell: bash
+      - name: 🔑 Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          touch ~/.ssh/known_hosts
-          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
-          echo "Listing ~/.ssh for verification (permissions)"
-          ls -l ~/.ssh || true
-          echo "✅ SSH key and known_hosts configured"
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Verify SSH connectivity (ssh -T)
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-        shell: bash
+      - name: 🛰️ Test SSH Connection
         run: |
-          PORT="${DEPLOY_PORT:-22}"
-          set -o pipefail
-          ssh -vvv -i ~/.ssh/id_ed25519 -p "$PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -T "$DEPLOY_USER@$DEPLOY_HOST" 'echo "server: $(hostname)" && echo "home: $HOME"' | sed 's/.*/✅ SSH OK: &/'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "echo 'SSH ✅ Connected'"
 
-      - name: Upload source to server (rsync with tar fallback)
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          APP_DIR: ${{ secrets.APP_DIR }}
-        shell: bash
+      - name: 🧱 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Install Dependencies
+        run: npm ci --verbose
+
+      - name: 🧩 Build Project
+        run: npm run build --if-present --verbose
+
+      - name: 📦 Deploy via rsync
         run: |
-          set -euo pipefail
-          PORT="${DEPLOY_PORT:-22}"
-          APP="${APP_DIR:-/var/www/nursery-system}"
+          rsync -avz --delete --progress -e "ssh -i ~/.ssh/id_rsa" ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/var/www/nursery-system"
 
-          # Ensure destination exists
-          ssh -i ~/.ssh/id_ed25519 -p "$PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$APP'"
-
-          if command -v rsync >/dev/null 2>&1; then
-            echo "📤 Using rsync to upload files"
-            rsync -e "ssh -i ~/.ssh/id_ed25519 -p $PORT" -azv --progress --delete \
-              --exclude ".git" \
-              --exclude "node_modules" \
-              --exclude ".github" \
-              --exclude "**/*.log" \
-              ./ "$DEPLOY_USER@$DEPLOY_HOST:$APP/"
-          else
-            echo "📦 rsync not found, falling back to tar over SSH"
-            tar --exclude=".git" --exclude="node_modules" --exclude=".github" -czf - . | \
-              ssh -i ~/.ssh/id_ed25519 -p "$PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$APP' && tar -xzf - -C '$APP'"
-          fi
-          echo "✅ Files uploaded to $APP"
-          echo "📂 Remote directory content preview:"
-          ssh -i ~/.ssh/id_ed25519 -p "$PORT" "$DEPLOY_USER@$DEPLOY_HOST" "ls -la '$APP' | sed -n '1,80p'"
-
-      - name: Install dependencies, build, and restart PM2 on server
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          APP_DIR: ${{ secrets.APP_DIR }}
-          NODE_VERSION: ${{ secrets.NODE_VERSION }}
-        shell: bash
+      - name: ⚙️ Restart PM2 Service
         run: |
-          set -euo pipefail
-          PORT="${DEPLOY_PORT:-22}"
-          APP="${APP_DIR:-/var/www/nursery-system}"
-          NODE_V="${NODE_VERSION:-18}"
+          ssh -i ~/.ssh/id_rsa "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
+            pm2 restart nursery-system || pm2 start /var/www/nursery-system/app.js --name nursery-system;
+            pm2 save;
+            pm2 list
+          "
 
-          ssh -i ~/.ssh/id_ed25519 -p "$PORT" -T "$DEPLOY_USER@$DEPLOY_HOST" bash -se <<EOF
-          set -ex
-          export DEBIAN_FRONTEND=noninteractive
-
-          # Ensure Node.js available (use nvm if present, otherwise try system node)
-          if [ -s "\$HOME/.nvm/nvm.sh" ]; then
-            . "\$HOME/.nvm/nvm.sh"
-            nvm install $NODE_V >/dev/null 2>&1 || true
-            nvm use $NODE_V >/dev/null 2>&1 || true
-          fi
-
-          cd "$APP"
-
-          # Install pm2 if needed
-          if ! command -v pm2 >/dev/null 2>&1; then
-            npm i -g pm2
-          fi
-
-          # Install deps and build
-          if [ -f package-lock.json ]; then
-            npm ci --verbose
-          else
-            npm install --verbose
-          fi
-          npm run build --if-present --verbose || npm run build --if-present
-
-          # Restart/start app via PM2
-          if [ -f ecosystem.config.cjs ]; then
-            pm2 startOrRestart ecosystem.config.cjs || pm2 restart ecosystem.config.cjs || pm2 start ecosystem.config.cjs
-          else
-            # Fallback: start server.js if PM2 ecosystem file does not exist
-            if [ -f server.js ]; then
-              pm2 start server.js --name nursery-system || pm2 restart nursery-system
-            fi
-          fi
-          pm2 save || true
-          echo "🔎 PM2 status and process description:"
-          pm2 status || true
-          pm2 describe nursery-system || true
-          echo "🔎 Tail recent PM2 logs:"
-          pm2 logs nursery-system --lines 120 --nostream || true
-          EOF
-          echo "✅ Remote install/build/restart complete"
-
-      - name: Post-deploy health check (optional)
-        if: ${{ secrets.HEALTHCHECK_URL != '' }}
-        env:
-          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
-        shell: bash
+      - name: 🧪 Health Check
         run: |
-          set -e
-          echo "🔎 Checking: $HEALTHCHECK_URL"
-          http_code=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTHCHECK_URL")
-          echo "HTTP $http_code"
-          test "$http_code" -ge 200 -a "$http_code" -lt 400
+          ssh -i ~/.ssh/id_rsa "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
+            curl -fs http://localhost:3000/api/health || exit 1
+          "
+          echo "✅ Health check passed!"
+
+      - name: 🔍 Deployment Summary
+        run: |
+          node -v
+          npm -v
+          ssh -i ~/.ssh/id_rsa "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "pm2 describe nursery-system"
