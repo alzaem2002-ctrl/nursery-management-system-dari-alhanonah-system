@@ -16,6 +16,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          token: ${{ secrets.SUBMODULES_PAT }}
 
       - name: 🧩 Fix missing submodule URLs if needed
         run: |
