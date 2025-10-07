@@ -1,20 +1,31 @@
-# Nursery Management System
+# Production Deployment: Node.js on Vercel and Render
 
-Node.js + Express + SQLite system.
+Production-ready Node.js + Express service with hardened middleware, suitable for Vercel (Serverless) and Render (always-on) deployments.
 
-## 🚀 تشغيل المشروع
+## 🚀 تشغيل المشروع محلياً
 ```bash
 npm install
 npm start
 ```
 
-- فتح المتصفح على:
-  - http://localhost:3000/api/health
-  - http://localhost:3000/api/performance/health
+- افتح:
+  - http://localhost:3000/
+  - http://localhost:3000/health
 
 ## 🛠️ سكربتات
 - `npm run db:check` → فحص قاعدة البيانات
 - `npm run db:reset` → إعادة البيانات التجريبية
+
+## 🔄 النشر على Vercel
+
+1. ثبّت Vercel CLI وسجّل الدخول.
+2. من داخل المشروع:
+   ```bash
+   vercel --prod
+   ```
+3. تحقّق من السجلات وجرّب الروابط الناتجة. يجب أن يظهر:
+   - الصفحة الرئيسية: "🚀 التطبيق يعمل بنجاح على Vercel!"
+   - الصحة: JSON مع `status: ok`.
 
 ## 🔄 CI/CD Auto Deploy (SSH)
 
@@ -78,10 +89,10 @@ ssh -i ./deploy_key -p 22 deploy@YOUR_HOST -T "echo ok"
 
 ## 🗂️ هيكل المشروع
 ```
-nursery-management-system/
-├── server.js              # الخادم الرئيسي
+project/
+├── server.js              # نقطة الدخول (تُصدّر app لـ Vercel)
 ├── package.json           # إعدادات Node.js
-├── .env                   # متغيرات البيئة
+├── .env                   # متغيرات البيئة (محلياً فقط)
 ├── database.sqlite        # قاعدة البيانات (ستُنشأ تلقائياً)
 ├── scripts/
 │   ├── db-check.js       # فحص قاعدة البيانات
@@ -90,11 +101,11 @@ nursery-management-system/
 ```
 
 ## 🎯 API Endpoints
-- `GET /api/health` - فحص حالة النظام
-- `GET /api/performance/health` - فحص أداء قاعدة البيانات
+- `GET /` - صفحة بسيطة للتأكد من التشغيل
+- `GET /health` - فحص حالة النظام
 
 ## 🔧 المتطلبات
-- Node.js 14+ 
+- Node.js 18+ 
 - npm أو yarn
 
 ---
