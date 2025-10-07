@@ -7,12 +7,14 @@
 
 ## 🔗 الرابط المباشر للتطبيق
 
-### 🌟 الرابط الرئيسي
+### 🌟 الرابط الرئيسي (محدّث - Cloudflare Tunnel)
 ```
-https://nursery-dar-hanonah.loca.lt
+https://valued-characters-lottery-festival.trycloudflare.com
 ```
 
-**انقر هنا:** [نظام إدارة دار الحنونة للحضانة](https://nursery-dar-hanonah.loca.lt)
+**انقر هنا:** [نظام إدارة دار الحنونة للحضانة](https://valued-characters-lottery-festival.trycloudflare.com)
+
+> ✅ **تم التحديث:** استخدام Cloudflare Tunnel بدلاً من LocalTunnel لأداء أفضل وأكثر استقراراً
 
 ---
 
