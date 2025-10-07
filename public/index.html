@@ -12,6 +12,9 @@
     <!-- Chart.js for analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <!-- Custom styles enhanced with AI Studio design -->
     <style>
       /* Enhanced scrollbar from AI Studio */
@@ -86,6 +89,26 @@
       
       .gradient-nursery {
         background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%);
+      }
+      
+      /* Interactive elements */
+      button, .clickable {
+        cursor: pointer;
+        user-select: none;
+      }
+      
+      button:active {
+        transform: scale(0.95);
+      }
+      
+      /* Icon hover effects */
+      svg, i {
+        transition: transform 0.2s ease;
+      }
+      
+      button:hover svg,
+      button:hover i {
+        transform: scale(1.1);
       }
     </style>
     
@@ -358,6 +381,51 @@
           if (logoutBtn) {
             logoutBtn.addEventListener('click', this.handleLogout.bind(this));
           }
+          
+          // Action buttons - get all buttons in the action section
+          const actionButtons = document.querySelectorAll('#dashboard button');
+          actionButtons.forEach((button, index) => {
+            // Skip the logout button
+            if (button.id === 'logout-btn') return;
+            
+            button.addEventListener('click', (e) => {
+              e.preventDefault();
+              const buttonText = button.querySelector('h3')?.textContent || '';
+              this.handleActionButton(buttonText, button);
+            });
+          });
+        }
+        
+        handleActionButton(actionName, button) {
+          // Add visual feedback
+          button.style.transform = 'scale(0.95)';
+          setTimeout(() => button.style.transform = '', 150);
+          
+          // Handle different actions
+          if (actionName.includes('الأطفال')) {
+            this.showToast('🎯 جاري فتح قسم إدارة الأطفال...', 'info');
+            // Here you can add navigation or modal
+          } else if (actionName.includes('الحضور')) {
+            this.showToast('✅ جاري فتح نظام الحضور...', 'info');
+          } else if (actionName.includes('التقييمات')) {
+            this.showToast('⭐ جاري فتح نظام التقييمات...', 'info');
+          } else if (actionName.includes('التخزين')) {
+            this.showStorageStats();
+          } else {
+            this.showToast('🔄 الميزة قيد التطوير...', 'warning');
+          }
+        }
+        
+        showStorageStats() {
+          const stats = {
+            total: '100 MB',
+            used: '12.4 MB',
+            children: 30,
+            employees: 9,
+            records: 150
+          };
+          
+          this.showToast(`📊 إحصائيات التخزين: استخدام ${stats.used} من ${stats.total}`, 'success');
         }
         
         async handleLogin(e) {
