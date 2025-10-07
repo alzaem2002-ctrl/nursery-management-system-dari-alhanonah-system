@@ -1,15 +1,12 @@
 services:
   - type: web
-    name: nursery-management-system
+    name: my-node-app
     env: node
     plan: free
-    buildCommand: npm install && npm run build || echo 'no build step'
-    startCommand: npm start || node server.js
-    autoDeploy: true
     branch: main
-    healthCheckPath: /
+    buildCommand: "npm install"
+    startCommand: "node server.js"
     envVars:
       - key: NODE_VERSION
-        value: 20
-      - key: NODE_ENV
-        value: production
+        value: 18
+    autoDeploy: true
