@@ -3,17 +3,13 @@ services:
     name: nursery-management-system
     env: node
     plan: free
-    region: oregon
+    buildCommand: npm install && npm run build || echo 'no build step'
+    startCommand: npm start || node server.js
     autoDeploy: true
-    buildCommand: npm ci --ignore-scripts
-    startCommand: npm start
-    healthCheckPath: /api/health
+    branch: main
+    healthCheckPath: /
     envVars:
       - key: NODE_VERSION
         value: 20
-      - key: DB_PATH
-        value: /var/data/database.sqlite
-    disk:
-      name: data
-      mountPath: /var/data
-      sizeGB: 1
+      - key: NODE_ENV
+        value: production

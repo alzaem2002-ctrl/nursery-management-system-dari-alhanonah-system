@@ -12,6 +12,8 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, "database.sqlite");
 // Middlewares
 app.use(express.json());
 app.use(morgan("dev"));
+// Serve static files if present to ensure root path responds
+app.use(express.static(path.join(__dirname, "public")));
 
 // Database connection
 let db = new sqlite3.Database(DB_PATH, (err) => {
@@ -23,6 +25,9 @@ let db = new sqlite3.Database(DB_PATH, (err) => {
 });
 
 // Health endpoint
+app.get("/", (req, res) => {
+  res.status(200).send("OK");
+});
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", message: "System is healthy" });
 });
