@@ -12,7 +12,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.get("/", (req, res) => {
-  res.status(200).send("🚀 التطبيق يعمل بنجاح على Vercel!");
+  res.status(200).send("التطبيق البسيط يعمل بنجاح");
 });
 
 app.get("/health", (req, res) => {
