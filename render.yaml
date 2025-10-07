@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: nursery-management-system
+    env: node
+    plan: free
+    region: oregon
+    autoDeploy: true
+    buildCommand: npm ci --ignore-scripts
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DB_PATH
+        value: /var/data/database.sqlite
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
