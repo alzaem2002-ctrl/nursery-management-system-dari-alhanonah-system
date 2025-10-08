@@ -1,2 +1,5 @@
 {"timestamp":"2025-10-08T07:35:58.764Z","requestId":"in9og2l82","method":"GET","url":"/","statusCode":404,"duration":"14ms","userAgent":"curl/8.12.1","ip":"::1"}
 {"timestamp":"2025-10-08T07:36:16.542Z","requestId":"uycfoyz43","method":"GET","url":"/health","statusCode":200,"duration":"3ms","userAgent":"curl/8.12.1","ip":"::1"}
+{"timestamp":"2025-10-08T09:58:54.807Z","requestId":"oxdd2o9qo","method":"GET","url":"/health","statusCode":200,"duration":"11ms","userAgent":"curl/8.12.1","ip":"::1"}
+{"timestamp":"2025-10-08T09:58:54.834Z","requestId":"qhmbird8u","method":"GET","url":"/api","statusCode":200,"duration":"1ms","userAgent":"curl/8.12.1","ip":"::1"}
+{"timestamp":"2025-10-08T09:58:54.857Z","requestId":"alntc9dm4","method":"GET","url":"/reports","statusCode":200,"duration":"1ms","userAgent":"curl/8.12.1","ip":"::1"}
