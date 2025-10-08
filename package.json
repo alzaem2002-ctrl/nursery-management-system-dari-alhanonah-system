@@ -9,6 +9,8 @@
     "dev": "NODE_ENV=development node server.js",
     "build": "bash build.sh",
     "build:preview": "mkdir -p dist && cp -r public/* dist/ 2>/dev/null || true && cp index.html dist/ 2>/dev/null || true",
+    "deploy": "bash smart-deploy.sh",
+    "deploy:production": "bash smart-deploy.sh",
     "test": "node .qa/run-tests.js",
     "test:security": "node .qa/security-audit.js",
     "test:all": "npm run test && npm run test:security",

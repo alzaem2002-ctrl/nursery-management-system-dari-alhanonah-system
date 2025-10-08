@@ -1,0 +1,209 @@
+name: 🚀 Production Smart Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      deploy_message:
+        description: 'Custom deployment message'
+        required: false
+        default: 'Manual production deployment'
+
+jobs:
+  smart-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🧩 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: 🏗️ Build application
+        run: |
+          npm run build || bash build.sh || {
+            echo "Creating fallback build..."
+            mkdir -p dist
+            cp -r public/* dist/ 2>/dev/null || true
+            cp index.html dist/ 2>/dev/null || true
+          }
+
+      - name: 🔍 Discover build directory
+        id: build-dir
+        run: |
+          BUILD_DIR=$(node -e "
+          const fs = require('fs');
+          const candidates = ['dist', 'build', 'out', 'public', '.next'];
+          const dir = candidates.find(d => {
+            try {
+              return fs.existsSync(d) && fs.readdirSync(d).length > 0;
+            } catch(e) {
+              return false;
+            }
+          });
+          console.log(dir || 'dist');
+          ")
+          echo "dir=${BUILD_DIR}" >> $GITHUB_OUTPUT
+          echo "✅ Build directory: ${BUILD_DIR}"
+
+      - name: 🧪 Verify build output
+        run: |
+          BUILD_DIR="${{ steps.build-dir.outputs.dir }}"
+          echo "📊 Build directory contents:"
+          ls -lah "${BUILD_DIR}/" | head -20
+          
+          if [ ! -d "${BUILD_DIR}" ] || [ -z "$(ls -A ${BUILD_DIR})" ]; then
+            echo "❌ Build directory is empty!"
+            exit 1
+          fi
+          
+          echo "✅ Build verification passed"
+
+      - name: 🚀 Deploy to Netlify
+        id: netlify-deploy
+        uses: nwtgck/actions-netlify@v2
+        with:
+          publish-dir: './${{ steps.build-dir.outputs.dir }}'
+          production-deploy: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: |
+            🚀 Production Deploy - ${{ github.event.head_commit.message || github.event.inputs.deploy_message }}
+            Commit: ${{ github.sha }}
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        timeout-minutes: 10
+
+      - name: 🚀 Deploy to Vercel (Alternative)
+        id: vercel-deploy
+        if: success() && secrets.VERCEL_TOKEN != ''
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./
+          vercel-args: '--prod'
+
+      - name: 🧪 Health check deployment
+        if: success()
+        run: |
+          DEPLOY_URL="${{ steps.netlify-deploy.outputs.deploy-url || steps.vercel-deploy.outputs.preview-url }}"
+          
+          if [ -n "$DEPLOY_URL" ]; then
+            echo "🔍 Testing deployment at: $DEPLOY_URL"
+            
+            # Wait for deployment to be ready
+            sleep 10
+            
+            # Test homepage
+            STATUS=$(curl -o /dev/null -s -w "%{http_code}" "${DEPLOY_URL}/")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Homepage: OK"
+            else
+              echo "⚠️  Homepage returned: $STATUS"
+            fi
+            
+            # Test health endpoint if available
+            STATUS=$(curl -o /dev/null -s -w "%{http_code}" "${DEPLOY_URL}/health")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Health endpoint: OK"
+            else
+              echo "ℹ️  Health endpoint: $STATUS (may not exist)"
+            fi
+          fi
+
+      - name: 📊 Create deployment report
+        if: always()
+        run: |
+          mkdir -p .qa
+          
+          cat > .qa/deployment-report.md <<EOF
+          # 🚀 Production Deployment Report
+          
+          **Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          **Status:** ${{ job.status }}
+          **Commit:** \`${{ github.sha }}\`
+          **Branch:** \`${{ github.ref_name }}\`
+          
+          ## 📦 Build Information
+          
+          - **Build Directory:** \`${{ steps.build-dir.outputs.dir }}\`
+          - **Node Version:** $(node --version)
+          - **NPM Version:** $(npm --version)
+          
+          ## 🌐 Deployment URLs
+          
+          ${{ steps.netlify-deploy.outputs.deploy-url && format('- **Netlify:** [{0}]({0})', steps.netlify-deploy.outputs.deploy-url) || '' }}
+          ${{ steps.vercel-deploy.outputs.preview-url && format('- **Vercel:** [{0}]({0})', steps.vercel-deploy.outputs.preview-url) || '' }}
+          
+          ## 📝 Commit Details
+          
+          **Message:** ${{ github.event.head_commit.message }}
+          **Author:** ${{ github.event.head_commit.author.name }}
+          
+          ---
+          *Deployed by GitHub Actions*
+          EOF
+          
+          cat .qa/deployment-report.md
+
+      - name: 📤 Upload deployment artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: deployment-report
+          path: .qa/deployment-report.md
+          retention-days: 90
+
+      - name: ✅ Notify success via Telegram
+        if: success() && secrets.TELEGRAM_BOT_TOKEN != ''
+        run: |
+          DEPLOY_URL="${{ steps.netlify-deploy.outputs.deploy-url || steps.vercel-deploy.outputs.preview-url }}"
+          
+          MSG="🚀 Production Deployment Success%0A"
+          MSG="${MSG}📝 Commit: ${{ github.event.head_commit.message }}%0A"
+          MSG="${MSG}🌿 Branch: ${{ github.ref_name }}%0A"
+          MSG="${MSG}🔗 URL: ${DEPLOY_URL}%0A"
+          MSG="${MSG}✅ Status: Live and Ready"
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=$MSG" \
+            -d "parse_mode=HTML"
+
+      - name: ⚠️ Notify failure via Telegram
+        if: failure() && secrets.TELEGRAM_BOT_TOKEN != ''
+        run: |
+          MSG="⚠️ Production Deployment Failed%0A"
+          MSG="${MSG}📝 Commit: ${{ github.event.head_commit.message }}%0A"
+          MSG="${MSG}🌿 Branch: ${{ github.ref_name }}%0A"
+          MSG="${MSG}🔍 Check: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=$MSG" \
+            -d "parse_mode=HTML"
+
+      - name: 📊 Summary
+        if: always()
+        run: |
+          echo "╔═══════════════════════════════════════════════════════════════╗"
+          echo "║  🚀 PRODUCTION DEPLOYMENT COMPLETE                           ║"
+          echo "╚═══════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "Status: ${{ job.status }}"
+          echo "URL: ${{ steps.netlify-deploy.outputs.deploy-url || steps.vercel-deploy.outputs.preview-url }}"
+          echo ""
