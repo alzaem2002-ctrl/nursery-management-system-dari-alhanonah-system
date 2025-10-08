@@ -1,9 +1,41 @@
 {
-  "version": 2,
+  "version": 3,
   "builds": [
-    { "src": "server.js", "use": "@vercel/node" }
+    {
+      "src": "server.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "server.js",
+          "package.json",
+          "public/**",
+          ".qa/**"
+        ],
+        "excludeFiles": [
+          "**/*.go",
+          "**/test/**",
+          "**/*.test.js"
+        ]
+      }
+    }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "server.js" }
-  ]
+    {
+      "src": "/(.*)",
+      "dest": "server.js",
+      "headers": {
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "strict-origin-when-cross-origin"
+      }
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "build": {
+    "env": {
+      "NODE_ENV": "production"
+    }
+  }
 }
