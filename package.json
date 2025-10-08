@@ -1,17 +1,42 @@
 {
-  "name": "my-node-app",
-  "version": "1.0.0",
-  "description": "Production-ready Node.js app for Vercel and Render",
+  "name": "smart-integrated-system",
+  "version": "2.0.0",
+  "description": "نظام متكامل ذكي بتقنيات حديثة مع أمان ومراقبة متقدمة",
   "main": "server.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "build": "echo 'No build step'"
+    "dev": "NODE_ENV=development node server.js",
+    "build": "echo 'No build step required for Node.js'",
+    "test": "node .qa/run-tests.js",
+    "test:security": "node .qa/security-audit.js",
+    "test:all": "npm run test && npm run test:security",
+    "audit": "npm audit --audit-level=moderate",
+    "quality-check": "node .qa/run-tests.js && node .qa/security-audit.js"
   },
   "dependencies": {
     "express": "^4.18.2",
     "helmet": "^7.1.0"
   },
+  "devDependencies": {},
   "engines": {
-    "node": ">=18"
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": [
+    "smart-system",
+    "production-ready",
+    "security",
+    "monitoring",
+    "icons",
+    "pwa",
+    "express",
+    "nodejs"
+  ],
+  "author": "Smart System Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-repo/smart-integrated-system"
   }
 }
