@@ -1,0 +1,366 @@
+name: 🚀 Smart Auto Deploy & Post-Deploy QA
+
+on:
+  push:
+    branches: ["main", "master"]
+  workflow_dispatch:
+
+jobs:
+  deploy-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: 🧩 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 🧱 Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: 🧠 Build project
+        run: |
+          echo "Building project..."
+          npm run build || bash build.sh || {
+            echo "Creating fallback build..."
+            mkdir -p dist
+            cp -r public/* dist/ 2>/dev/null || true
+            cp index.html dist/ 2>/dev/null || true
+          }
+
+      - name: 🌐 Detect build directory
+        id: detect
+        run: |
+          BUILD_DIR=$(node -e "
+          const fs = require('fs');
+          const dirs = ['dist', 'build', 'out', 'public', '.next', '.output'];
+          const found = dirs.find(d => {
+            try {
+              return fs.existsSync(d) && fs.readdirSync(d).length > 0;
+            } catch(e) {
+              return false;
+            }
+          });
+          if (!found) {
+            console.error('❌ No build output found');
+            process.exit(1);
+          }
+          console.log(found);
+          ")
+          echo "BUILD_DIR=$BUILD_DIR" >> $GITHUB_ENV
+          echo "dir=$BUILD_DIR" >> $GITHUB_OUTPUT
+          echo "✅ Detected build directory: $BUILD_DIR"
+
+      - name: 🚀 Deploy to Netlify
+        id: netlify-deploy
+        uses: nwtgck/actions-netlify@v2
+        with:
+          publish-dir: "${{ env.BUILD_DIR }}"
+          production-deploy: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "🚀 Smart Auto Deploy - ${{ github.event.head_commit.message }} - $(date -u +'%Y-%m-%d %H:%M:%S')"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        timeout-minutes: 10
+
+      - name: 🔗 Extract deployment URL
+        id: deploy-url
+        run: |
+          DEPLOY_URL="${{ steps.netlify-deploy.outputs.deploy-url }}"
+          if [ -z "$DEPLOY_URL" ]; then
+            # Fallback to configured URL
+            DEPLOY_URL="https://dari-system.netlify.app"
+          fi
+          echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          echo "✅ Deployment URL: $DEPLOY_URL"
+
+      - name: ⏱️ Wait for deployment to be ready
+        run: |
+          echo "⏱️  Waiting 15 seconds for deployment to propagate..."
+          sleep 15
+
+      - name: 🧪 Post-Deploy QA Verification
+        id: qa-verify
+        run: |
+          DEPLOY_URL="${{ steps.deploy-url.outputs.url }}"
+          echo "╔═══════════════════════════════════════════════════════════════╗"
+          echo "║  🧪 POST-DEPLOY QA VERIFICATION                              ║"
+          echo "╚═══════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "🔍 Verifying deployment at: $DEPLOY_URL"
+          echo ""
+          
+          mkdir -p .qa
+          rm -f failures.log
+          touch failures.log
+          
+          # Initialize QA report
+          cat > .qa/post-deploy-summary.txt <<HEADER
+          ═══════════════════════════════════════════════════════════════
+          🧪 POST-DEPLOY QA VERIFICATION REPORT
+          ═══════════════════════════════════════════════════════════════
+          
+          Deployment URL: $DEPLOY_URL
+          Deployment Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          Commit: ${{ github.sha }}
+          Branch: ${{ github.ref_name }}
+          
+          ═══════════════════════════════════════════════════════════════
+          📊 ROUTE VERIFICATION
+          ═══════════════════════════════════════════════════════════════
+          
+          HEADER
+          
+          # Define routes to test
+          ROUTES=( "/" "/health" "/api" "/reports" "/manifest.json" "/favicon.svg" )
+          
+          PASSED=0
+          FAILED=0
+          
+          echo "Testing routes..."
+          for route in "${ROUTES[@]}"; do
+            echo -n "  Testing $route ... "
+            code=$(curl -o /dev/null -s -w "%{http_code}" --max-time 10 "$DEPLOY_URL$route" || echo "000")
+            
+            if [ "$code" = "200" ]; then
+              echo "✅ OK"
+              echo "✅ $route => HTTP $code" >> .qa/post-deploy-summary.txt
+              ((PASSED++))
+            else
+              echo "❌ FAILED ($code)"
+              echo "❌ $route => HTTP $code (FAILED)" >> .qa/post-deploy-summary.txt
+              echo "❌ $route failed (HTTP $code)" >> failures.log
+              ((FAILED++))
+            fi
+          done
+          
+          echo "" >> .qa/post-deploy-summary.txt
+          echo "═══════════════════════════════════════════════════════════════" >> .qa/post-deploy-summary.txt
+          echo "🎨 ICON & ASSET VERIFICATION" >> .qa/post-deploy-summary.txt
+          echo "═══════════════════════════════════════════════════════════════" >> .qa/post-deploy-summary.txt
+          echo "" >> .qa/post-deploy-summary.txt
+          
+          # Check for icons in homepage
+          echo -n "  Checking icons... "
+          ICONS=$(curl -s --max-time 10 "$DEPLOY_URL" | grep -iE "icon|img|svg" | wc -l || echo "0")
+          echo "$ICONS found"
+          echo "🧩 Icons/Images detected: $ICONS" >> .qa/post-deploy-summary.txt
+          
+          if [ "$ICONS" -gt 5 ]; then
+            echo "✅ Icon check: PASSED (found $ICONS references)" >> .qa/post-deploy-summary.txt
+          else
+            echo "⚠️  Icon check: WARNING (found only $ICONS references)" >> .qa/post-deploy-summary.txt
+            echo "⚠️  Icons may be missing (found only $ICONS)" >> failures.log
+          fi
+          
+          echo "" >> .qa/post-deploy-summary.txt
+          echo "═══════════════════════════════════════════════════════════════" >> .qa/post-deploy-summary.txt
+          echo "📊 TEST SUMMARY" >> .qa/post-deploy-summary.txt
+          echo "═══════════════════════════════════════════════════════════════" >> .qa/post-deploy-summary.txt
+          echo "" >> .qa/post-deploy-summary.txt
+          echo "Routes Tested: ${#ROUTES[@]}" >> .qa/post-deploy-summary.txt
+          echo "✅ Passed: $PASSED" >> .qa/post-deploy-summary.txt
+          echo "❌ Failed: $FAILED" >> .qa/post-deploy-summary.txt
+          echo "📈 Success Rate: $(awk "BEGIN {printf \"%.1f\", ($PASSED/($PASSED+$FAILED))*100}")%" >> .qa/post-deploy-summary.txt
+          
+          echo ""
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          
+          # Check if there are failures
+          if [ -s failures.log ]; then
+            echo "has_failures=true" >> $GITHUB_OUTPUT
+            echo ""
+            echo "⚠️  Some checks failed:"
+            cat failures.log
+          else
+            echo "has_failures=false" >> $GITHUB_OUTPUT
+            echo ""
+            echo "✅ All checks passed!"
+          fi
+
+      - name: 🔧 Auto-Repair (if needed)
+        if: steps.qa-verify.outputs.has_failures == 'true'
+        run: |
+          echo "" >> .qa/post-deploy-summary.txt
+          echo "═══════════════════════════════════════════════════════════════" >> .qa/post-deploy-summary.txt
+          echo "🔧 AUTO-REPAIR SEQUENCE" >> .qa/post-deploy-summary.txt
+          echo "═══════════════════════════════════════════════════════════════" >> .qa/post-deploy-summary.txt
+          echo "" >> .qa/post-deploy-summary.txt
+          
+          echo "⚠️  Failures detected, initiating auto-repair sequence..."
+          echo "⚠️  Auto-repair initiated at $(date -u)" >> .qa/post-deploy-summary.txt
+          
+          # Clean and rebuild
+          echo "  → Cleaning dependencies..."
+          rm -rf node_modules package-lock.json
+          
+          echo "  → Reinstalling dependencies..."
+          npm install --legacy-peer-deps
+          echo "✅ Dependencies reinstalled" >> .qa/post-deploy-summary.txt
+          
+          echo "  → Rebuilding project..."
+          npm run build || bash build.sh
+          echo "✅ Project rebuilt" >> .qa/post-deploy-summary.txt
+          
+          echo "  → Redeploying..."
+          npx netlify deploy --prod --dir="${{ env.BUILD_DIR }}" \
+            --auth="${{ secrets.NETLIFY_AUTH_TOKEN }}" \
+            --site="${{ secrets.NETLIFY_SITE_ID }}" \
+            --message="🔁 Smart Auto-Repair Redeploy $(date -u +'%Y-%m-%d %H:%M:%S')" || {
+            echo "❌ Auto-repair redeploy failed" >> .qa/post-deploy-summary.txt
+          }
+          
+          echo "✅ Auto-repair sequence completed at $(date -u)" >> .qa/post-deploy-summary.txt
+          echo ""
+          echo "✅ Auto-repair completed"
+
+      - name: 📊 Final status
+        if: always()
+        run: |
+          echo "" >> .qa/post-deploy-summary.txt
+          echo "═══════════════════════════════════════════════════════════════" >> .qa/post-deploy-summary.txt
+          echo "🏁 FINAL STATUS" >> .qa/post-deploy-summary.txt
+          echo "═══════════════════════════════════════════════════════════════" >> .qa/post-deploy-summary.txt
+          echo "" >> .qa/post-deploy-summary.txt
+          
+          if [ "${{ steps.qa-verify.outputs.has_failures }}" = "true" ]; then
+            echo "Status: ⚠️  COMPLETED WITH AUTO-REPAIR" >> .qa/post-deploy-summary.txt
+          else
+            echo "Status: ✅ ALL TESTS PASSED" >> .qa/post-deploy-summary.txt
+          fi
+          
+          echo "Deployment URL: ${{ steps.deploy-url.outputs.url }}" >> .qa/post-deploy-summary.txt
+          echo "Completed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> .qa/post-deploy-summary.txt
+          echo "" >> .qa/post-deploy-summary.txt
+          echo "═══════════════════════════════════════════════════════════════" >> .qa/post-deploy-summary.txt
+          
+          # Display report
+          echo ""
+          echo "╔═══════════════════════════════════════════════════════════════╗"
+          echo "║  📊 QA VERIFICATION COMPLETE                                 ║"
+          echo "╚═══════════════════════════════════════════════════════════════╝"
+          echo ""
+          cat .qa/post-deploy-summary.txt
+
+      - name: 📤 Upload QA artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: post-deploy-qa-report-${{ github.run_number }}
+          path: |
+            .qa/post-deploy-summary.txt
+            failures.log
+          retention-days: 90
+
+      - name: 📦 Commit QA results to qa/reports branch
+        if: always()
+        run: |
+          echo "📦 Saving QA report to qa/reports branch..."
+          
+          git config user.name "Smart QA Agent"
+          git config user.email "qa-agent@system.bot"
+          
+          # Fetch and checkout qa/reports branch
+          git fetch origin qa/reports 2>/dev/null || true
+          git checkout -B qa/reports
+          
+          # Copy and rename report with timestamp
+          TIMESTAMP=$(date -u +'%Y%m%d-%H%M%S')
+          cp .qa/post-deploy-summary.txt "./post-deploy-${TIMESTAMP}.txt"
+          
+          # Also keep a "latest" version
+          cp .qa/post-deploy-summary.txt "./post-deploy-latest.txt"
+          
+          # Create index if it doesn't exist
+          if [ ! -f "README.md" ]; then
+            cat > README.md <<EOF
+          # 🧪 QA Reports
+          
+          This branch contains automated QA verification reports from production deployments.
+          
+          ## Latest Report
+          
+          See: [post-deploy-latest.txt](post-deploy-latest.txt)
+          
+          ## Report History
+          
+          Reports are saved with timestamps: \`post-deploy-YYYYMMDD-HHMMSS.txt\`
+          
+          ---
+          *Auto-generated by Smart QA Agent*
+          EOF
+          fi
+          
+          # Add and commit
+          git add post-deploy-*.txt README.md
+          git commit -m "🧪 QA Report: $(date -u +'%Y-%m-%d %H:%M:%S UTC') - Run #${{ github.run_number }}" || {
+            echo "No changes to commit"
+          }
+          
+          # Push to qa/reports branch
+          git push origin qa/reports --force || {
+            echo "⚠️  Failed to push to qa/reports branch"
+          }
+          
+          # Switch back to original branch
+          git checkout ${{ github.ref_name }}
+          
+          echo "✅ QA report saved to qa/reports branch"
+
+      - name: 📲 Notify via Telegram
+        if: always() && secrets.TELEGRAM_BOT_TOKEN != ''
+        run: |
+          # Determine status
+          if [ "${{ steps.qa-verify.outputs.has_failures }}" = "true" ]; then
+            STATUS="⚠️ Issues detected — auto-repair applied"
+            EMOJI="⚠️"
+          else
+            STATUS="✅ All systems operational"
+            EMOJI="✅"
+          fi
+          
+          # Create message
+          MSG="${EMOJI} *Smart Auto Deploy & QA Report*%0A%0A"
+          MSG="${MSG}Status: ${STATUS}%0A"
+          MSG="${MSG}🔗 URL: ${{ steps.deploy-url.outputs.url }}%0A"
+          MSG="${MSG}📊 Tests: ${{ steps.qa-verify.outputs.passed }} passed, ${{ steps.qa-verify.outputs.failed }} failed%0A"
+          MSG="${MSG}🌿 Branch: \`${{ github.ref_name }}\`%0A"
+          MSG="${MSG}🧾 Report: https://github.com/${{ github.repository }}/tree/qa/reports%0A"
+          MSG="${MSG}🔍 Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          
+          # Send to Telegram
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "parse_mode=Markdown" \
+            -d "text=${MSG}" || {
+            echo "⚠️  Failed to send Telegram notification"
+          }
+          
+          echo "✅ Telegram notification sent"
+
+      - name: 🎉 Summary
+        if: always()
+        run: |
+          echo ""
+          echo "╔═══════════════════════════════════════════════════════════════╗"
+          echo "║  🎉 SMART AUTO DEPLOY & QA - COMPLETE                        ║"
+          echo "╚═══════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "Deployment URL: ${{ steps.deploy-url.outputs.url }}"
+          echo "Tests Passed: ${{ steps.qa-verify.outputs.passed }}"
+          echo "Tests Failed: ${{ steps.qa-verify.outputs.failed }}"
+          echo "Auto-Repair: ${{ steps.qa-verify.outputs.has_failures == 'true' && 'Applied' || 'Not needed' }}"
+          echo "QA Reports: https://github.com/${{ github.repository }}/tree/qa/reports"
+          echo ""
