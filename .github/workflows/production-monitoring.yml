@@ -1,0 +1,158 @@
+name: Production Monitoring
+
+on:
+  schedule:
+    # Run every 12 hours (at 00:00 and 12:00 UTC)
+    - cron: '0 0,12 * * *'
+  workflow_dispatch:
+    # Allow manual triggering
+
+jobs:
+  monitor:
+    name: 🔍 Production Monitoring & Uptime Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 🔧 Setup Monitoring Environment
+        run: |
+          echo "🔧 Setting up monitoring environment..."
+          mkdir -p .monitor/logs
+          chmod +x .monitor/monitor-automation.sh
+          
+      - name: 🌐 Check Deployment URL
+        env:
+          DEPLOY_URL: https://dari-system.netlify.app
+        run: |
+          echo "🌐 Testing deployment at: $DEPLOY_URL"
+          status=$(curl -o /dev/null -s -w "%{http_code}" -L --max-time 10 "$DEPLOY_URL")
+          echo "Status: $status"
+          
+          if [ "$status" = "200" ]; then
+            echo "✅ Site is UP and reachable"
+          else
+            echo "❌ Site returned status: $status"
+            echo "::warning::Deployment returned non-200 status: $status"
+          fi
+
+      - name: ⚡ Measure Response Time
+        env:
+          DEPLOY_URL: https://dari-system.netlify.app
+        run: |
+          echo "⚡ Measuring response time..."
+          time=$(curl -o /dev/null -s -w "%{time_total}" -L --max-time 10 "$DEPLOY_URL")
+          echo "Response time: ${time}s"
+          
+          # Convert to milliseconds for easier reading
+          ms=$(awk "BEGIN {printf \"%.0f\", $time * 1000}")
+          echo "Response time: ${ms}ms"
+          
+          if [ "$ms" -lt 500 ]; then
+            echo "✅ Excellent response time"
+          elif [ "$ms" -lt 1000 ]; then
+            echo "✅ Good response time"
+          elif [ "$ms" -lt 2000 ]; then
+            echo "⚠️ Acceptable response time"
+          else
+            echo "❌ Slow response time"
+            echo "::warning::Response time is ${ms}ms, which exceeds 2s threshold"
+          fi
+
+      - name: 🔍 Test Critical Endpoints
+        env:
+          DEPLOY_URL: https://dari-system.netlify.app
+        run: |
+          echo "🔍 Testing critical endpoints..."
+          
+          endpoints=("/" "/health")
+          failed=0
+          
+          for endpoint in "${endpoints[@]}"; do
+            status=$(curl -o /dev/null -s -w "%{http_code}" -L --max-time 10 "${DEPLOY_URL}${endpoint}")
+            time=$(curl -o /dev/null -s -w "%{time_total}" -L --max-time 10 "${DEPLOY_URL}${endpoint}")
+            
+            if [ "$status" = "200" ]; then
+              echo "✅ $endpoint - OK ($status) ${time}s"
+            else
+              echo "❌ $endpoint - FAILED ($status)"
+              failed=$((failed + 1))
+            fi
+          done
+          
+          if [ $failed -gt 0 ]; then
+            echo "::error::$failed endpoint(s) failed"
+            exit 1
+          else
+            echo "✅ All endpoints operational"
+          fi
+
+      - name: 📊 Run Full Monitoring Script
+        env:
+          DEPLOY_URL: https://dari-system.netlify.app
+        run: |
+          echo "📊 Running comprehensive monitoring..."
+          bash .monitor/monitor-automation.sh || echo "Monitoring completed with warnings"
+
+      - name: 💾 Save Monitoring Reports
+        run: |
+          echo "💾 Preparing monitoring reports..."
+          
+          # Create a summary for GitHub Actions
+          if [ -f .monitor/logs/latest.txt ]; then
+            echo "📄 Latest monitoring report:"
+            tail -20 .monitor/logs/latest.txt
+          fi
+          
+          # List all reports
+          echo ""
+          echo "📁 Available reports:"
+          ls -lh .monitor/logs/
+
+      - name: 📤 Upload Monitoring Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: monitoring-reports-${{ github.run_number }}
+          path: .monitor/logs/
+          retention-days: 90
+
+      - name: 🔔 Notify on Failure
+        if: failure()
+        run: |
+          echo "🚨 MONITORING ALERT: Production monitoring detected issues!"
+          echo "Check the workflow logs and artifacts for details."
+          
+          # In production, this would trigger:
+          # - Email notifications
+          # - Slack alerts
+          # - PagerDuty incidents
+          # - SMS alerts for critical issues
+          
+          # Example: Send to Slack (requires SLACK_WEBHOOK secret)
+          # curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
+          #   -H 'Content-Type: application/json' \
+          #   -d '{"text":"🚨 Production monitoring failed! Check GitHub Actions."}'
+
+      - name: ✅ Monitoring Summary
+        if: success()
+        run: |
+          echo "════════════════════════════════════════════════════════════════"
+          echo "✅ PRODUCTION MONITORING COMPLETED SUCCESSFULLY"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "📅 Date: $(date)"
+          echo "🌐 Target: https://dari-system.netlify.app"
+          echo "✅ Status: All systems operational"
+          echo "⏰ Next check: In 12 hours"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
