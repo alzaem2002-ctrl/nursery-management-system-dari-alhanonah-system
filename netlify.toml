@@ -1,0 +1,66 @@
+# Netlify Configuration for Dari Nursery System
+# Auto-configured for preview deployments
+
+[build]
+  publish = "dist"
+  command = "npm run build || mkdir -p dist && cp -r public/* dist/ && cp index.html dist/"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_VERSION = "10"
+
+# Production deployment settings
+[context.production]
+  publish = "dist"
+  command = "npm ci && npm run build || mkdir -p dist && cp -r public/* dist/ && cp index.html dist/"
+
+# Preview deployments (PRs)
+[context.deploy-preview]
+  publish = "dist"
+  command = "mkdir -p dist && cp -r public/* dist/ 2>/dev/null || true && cp index.html dist/ 2>/dev/null || true"
+
+# Branch deployments
+[context.branch-deploy]
+  publish = "dist"
+  command = "mkdir -p dist && cp -r public/* dist/ 2>/dev/null || true && cp index.html dist/ 2>/dev/null || true"
+
+# Redirect rules for SPA
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+  conditions = {Role = ["admin"]}
+
+# Headers for security
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# Cache static assets
+[[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+    Content-Type = "image/svg+xml"
+
+[[headers]]
+  for = "/*.json"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+    Content-Type = "application/json"
+
+# Functions (if using Netlify Functions)
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"

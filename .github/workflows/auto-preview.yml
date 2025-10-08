@@ -1,0 +1,195 @@
+name: 🚀 Auto Preview & QA Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  build-and-preview:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    
+    steps:
+      - name: 🧩 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏗️ Build application
+        run: |
+          echo "Building application for preview..."
+          mkdir -p dist
+          cp -r public/* dist/ 2>/dev/null || true
+          cp index.html dist/ 2>/dev/null || true
+          echo "Build complete"
+
+      - name: 🚀 Start server for QA
+        run: |
+          nohup npm start > server.log 2>&1 &
+          sleep 5
+          echo "Server started, waiting for initialization..."
+          sleep 3
+
+      - name: 🧠 Run Quick QA Tests
+        id: qa-tests
+        run: |
+          echo "=== QUICK QA CHECK ===" > qa-preview.txt
+          echo "PR #${{ github.event.pull_request.number }}" >> qa-preview.txt
+          echo "Commit: ${{ github.sha }}" >> qa-preview.txt
+          echo "" >> qa-preview.txt
+          
+          passed=0
+          failed=0
+          
+          # Test critical routes
+          pages=("/" "/health" "/api" "/manifest.json" "/favicon.svg")
+          
+          for page in "${pages[@]}"; do
+            code=$(curl -o /dev/null -s -w "%{http_code}" "http://localhost:3000${page}")
+            if [ "$code" = "200" ]; then
+              echo "✅ $page => HTTP $code" >> qa-preview.txt
+              ((passed++))
+            else
+              echo "❌ $page => HTTP $code" >> qa-preview.txt
+              ((failed++))
+            fi
+          done
+          
+          echo "" >> qa-preview.txt
+          echo "📊 Results: $passed passed, $failed failed" >> qa-preview.txt
+          
+          cat qa-preview.txt
+          
+          # Export for use in PR comment
+          echo "qa_passed=$passed" >> $GITHUB_OUTPUT
+          echo "qa_failed=$failed" >> $GITHUB_OUTPUT
+          
+          # Fail workflow if any tests failed
+          if [ $failed -gt 0 ]; then
+            echo "::error::QA tests failed - $failed test(s) failed"
+            exit 1
+          fi
+
+      - name: 📤 Upload QA Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-preview-report-${{ github.event.pull_request.number }}
+          path: qa-preview.txt
+          retention-days: 30
+
+      - name: 🌐 Deploy Preview to Vercel
+        id: deploy-vercel
+        uses: amondnet/vercel-action@v25
+        if: success()
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./
+          alias-domains: |
+            pr-${{ github.event.pull_request.number }}.dari-nursery.vercel.app
+
+      - name: 🌐 Deploy Preview to Netlify (Alternative)
+        id: deploy-netlify
+        uses: nwtgck/actions-netlify@v2
+        if: success() && secrets.NETLIFY_AUTH_TOKEN != ''
+        with:
+          publish-dir: './dist'
+          production-deploy: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "Preview for PR #${{ github.event.pull_request.number }}"
+          alias: pr-${{ github.event.pull_request.number }}
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+      - name: 💬 Comment on Pull Request
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: success()
+        with:
+          header: preview-deployment
+          message: |
+            ## ✅ Preview Environment Ready
+            
+            🎉 **Automated preview deployment completed successfully!**
+            
+            ### 🔗 Preview Links
+            ${{ steps.deploy-vercel.outputs.preview-url && format('- 🚀 **Vercel Preview:** [{0}]({0})', steps.deploy-vercel.outputs.preview-url) || '' }}
+            ${{ steps.deploy-netlify.outputs.deploy-url && format('- 🌐 **Netlify Preview:** [{0}]({0})', steps.deploy-netlify.outputs.deploy-url) || '' }}
+            
+            ### 🧪 QA Test Results
+            - ✅ Tests Passed: **${{ steps.qa-tests.outputs.qa_passed }}**
+            - ❌ Tests Failed: **${{ steps.qa-tests.outputs.qa_failed }}**
+            - 📊 Success Rate: **100%**
+            
+            ### 📦 Resources
+            - 📄 [Full QA Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) (see artifacts)
+            - 🔍 Commit: `${{ github.event.pull_request.head.sha }}`
+            - 🌿 Branch: `${{ github.event.pull_request.head.ref }}`
+            
+            ---
+            _🤖 Deployed automatically by the Smart Preview Agent • [View Workflow](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})_
+
+      - name: 💬 Comment on Failure
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: failure()
+        with:
+          header: preview-deployment
+          message: |
+            ## ❌ Preview Deployment Failed
+            
+            The automated preview deployment encountered errors during QA verification.
+            
+            ### 📊 Test Results
+            - ✅ Tests Passed: **${{ steps.qa-tests.outputs.qa_passed || 0 }}**
+            - ❌ Tests Failed: **${{ steps.qa-tests.outputs.qa_failed || 'Unknown' }}**
+            
+            ### 🔍 Next Steps
+            1. Check the [workflow logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details
+            2. Review and fix any failing tests
+            3. Push your changes to trigger a new preview deployment
+            
+            ---
+            _🤖 Automated by the Smart Preview Agent_
+
+      - name: ✅ Notify Telegram on Success
+        if: success() && secrets.TELEGRAM_BOT_TOKEN != ''
+        run: |
+          MSG="✅ Preview created for PR #${{ github.event.pull_request.number }}%0A"
+          MSG="${MSG}📝 ${{ github.event.pull_request.title }}%0A"
+          MSG="${MSG}🔗 Preview: ${{ steps.deploy-vercel.outputs.preview-url || steps.deploy-netlify.outputs.deploy-url }}%0A"
+          MSG="${MSG}🧪 QA: ${{ steps.qa-tests.outputs.qa_passed }} tests passed"
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=$MSG" \
+            -d "parse_mode=HTML"
+
+      - name: ⚠️ Notify Telegram on Failure
+        if: failure() && secrets.TELEGRAM_BOT_TOKEN != ''
+        run: |
+          MSG="⚠️ Preview deployment failed for PR #${{ github.event.pull_request.number }}%0A"
+          MSG="${MSG}📝 ${{ github.event.pull_request.title }}%0A"
+          MSG="${MSG}❌ Failed tests: ${{ steps.qa-tests.outputs.qa_failed || 'Unknown' }}%0A"
+          MSG="${MSG}🔍 Check logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=$MSG" \
+            -d "parse_mode=HTML"
+
+      - name: 🧹 Cleanup
+        if: always()
+        run: |
+          pkill -f "node server.js" || true
+          echo "Cleanup completed"
