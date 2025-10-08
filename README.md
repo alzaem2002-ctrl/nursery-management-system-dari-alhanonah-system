@@ -2,6 +2,23 @@
 
 Production-ready Node.js + Express service with hardened middleware, suitable for Vercel (Serverless) and Render (always-on) deployments.
 
+## 🔍 Live Monitoring Dashboard
+
+> **Auto-updated every 12 hours via GitHub Actions**
+
+| Metric | Status | Value |
+|--------|--------|-------|
+| 🔄 Last Check | - | 2025-01-01 00:00 UTC |
+| 🟢 Uptime | - | ✅ UP |
+| ⚡ Response Time | - | 200ms |
+| 🧠 Performance Score | - | 92/100 |
+| 🔗 Endpoints | - | 2/2 |
+| 📈 Overall Status | - | PASS ✅ |
+
+[📊 View Full Dashboard](https://alzaem2002-ctrl.github.io/nursery-management-system-dari-alhanonah-system/)
+
+---
+
 ## 🚀 تشغيل المشروع محلياً
 ```bash
 npm install
