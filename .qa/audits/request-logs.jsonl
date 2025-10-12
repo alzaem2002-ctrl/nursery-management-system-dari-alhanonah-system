@@ -1,2 +1,3 @@
 {"timestamp":"2025-10-08T07:35:58.764Z","requestId":"in9og2l82","method":"GET","url":"/","statusCode":404,"duration":"14ms","userAgent":"curl/8.12.1","ip":"::1"}
 {"timestamp":"2025-10-08T07:36:16.542Z","requestId":"uycfoyz43","method":"GET","url":"/health","statusCode":200,"duration":"3ms","userAgent":"curl/8.12.1","ip":"::1"}
+{"timestamp":"2025-10-12T17:38:31.550Z","requestId":"247dtuefo","method":"GET","url":"/health","statusCode":200,"duration":"6ms","userAgent":"curl/8.12.1","ip":"::ffff:127.0.0.1"}
