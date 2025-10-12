@@ -5,3 +5,7 @@
 {"timestamp":"2025-10-12T18:22:51.131Z","requestId":"1o1b0d3in","method":"GET","url":"/health","statusCode":200,"duration":"5ms","userAgent":"curl/8.12.1","ip":"::1"}
 {"timestamp":"2025-10-12T18:24:30.391Z","requestId":"zd9aai44j","method":"GET","url":"/health","statusCode":200,"duration":"1ms","userAgent":"curl/8.12.1","ip":"::1"}
 {"timestamp":"2025-10-12T18:24:39.913Z","requestId":"x738x3jw2","method":"GET","url":"/health","statusCode":200,"duration":"1ms","userAgent":"curl/8.12.1","ip":"::1"}
+{"timestamp":"2025-10-12T18:28:13.137Z","requestId":"d58p7j9zx","method":"GET","url":"/","statusCode":404,"duration":"1ms","userAgent":"NetworkingExtension/8621.3.11.10.3 Network/4277.140.33 iOS/18.6.2","ip":"::1"}
+{"timestamp":"2025-10-12T18:28:13.147Z","requestId":"uiy31k6jv","method":"GET","url":"/","statusCode":404,"duration":"1ms","userAgent":"NetworkingExtension/8621.3.11.10.3 Network/4277.140.33 iOS/18.6.2","ip":"::1"}
+{"timestamp":"2025-10-12T18:28:13.224Z","requestId":"u1ui8be7y","method":"GET","url":"/","statusCode":404,"duration":"1ms","userAgent":"NetworkingExtension/8621.3.11.10.3 Network/4277.140.33 iOS/18.6.2","ip":"::1"}
+{"timestamp":"2025-10-12T18:28:18.659Z","requestId":"t6kbzqrdg","method":"GET","url":"/","statusCode":404,"duration":"0ms","userAgent":"Mozilla/5.0 (iPad; CPU OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/141.0","ip":"::1"}
