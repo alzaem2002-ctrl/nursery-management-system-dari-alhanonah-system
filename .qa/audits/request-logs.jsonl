@@ -9,3 +9,6 @@
 {"timestamp":"2025-10-12T18:28:13.147Z","requestId":"uiy31k6jv","method":"GET","url":"/","statusCode":404,"duration":"1ms","userAgent":"NetworkingExtension/8621.3.11.10.3 Network/4277.140.33 iOS/18.6.2","ip":"::1"}
 {"timestamp":"2025-10-12T18:28:13.224Z","requestId":"u1ui8be7y","method":"GET","url":"/","statusCode":404,"duration":"1ms","userAgent":"NetworkingExtension/8621.3.11.10.3 Network/4277.140.33 iOS/18.6.2","ip":"::1"}
 {"timestamp":"2025-10-12T18:28:18.659Z","requestId":"t6kbzqrdg","method":"GET","url":"/","statusCode":404,"duration":"0ms","userAgent":"Mozilla/5.0 (iPad; CPU OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/141.0","ip":"::1"}
+{"timestamp":"2025-10-12T18:43:53.577Z","requestId":"mstpyu96w","method":"GET","url":"/health","statusCode":200,"duration":"3ms","userAgent":"curl/8.12.1","ip":"::1"}
+{"timestamp":"2025-10-12T18:45:25.944Z","requestId":"du7i8qn9x","method":"GET","url":"/health","statusCode":200,"duration":"1ms","userAgent":"curl/8.12.1","ip":"::1"}
+{"timestamp":"2025-10-12T18:46:44.856Z","requestId":"4x2j07cip","method":"GET","url":"/health","statusCode":200,"duration":"1ms","userAgent":"curl/8.12.1","ip":"::1"}
