@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تقرير التشغيل - Cloudflare TryTunnel</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 20px;
+            direction: rtl;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        h1 {
+            color: #00ff90;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin: 20px 0;
+        }
+        .status-success {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #0f0;
+        }
+        .status-failed {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: #fff;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        td, th {
+            padding: 15px;
+            text-align: right;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        th {
+            background: rgba(0,0,0,0.3);
+            font-weight: bold;
+            width: 200px;
+        }
+        td {
+            background: rgba(255,255,255,0.05);
+        }
+        a {
+            color: #00ff90;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        a:hover {
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff;
+        }
+        .code-block {
+            background: rgba(0,0,0,0.4);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            border-left: 4px solid #00ff90;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            opacity: 0.8;
+        }
+        .emoji { font-size: 1.3em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><span class="emoji">📊</span> تقرير التشغيل الفوري</h1>
+        <div style="text-align: center;">
+            <span class="status-badge status-failed">
+                ⚠️ FAILED
+            </span>
+        </div>
+        
+        <table>
+            <tr><th><span class="emoji">⏰</span> الوقت</th><td>Sun Oct 12 06:22:30 PM UTC 2025</td></tr>
+            <tr><th><span class="emoji">🌍</span> الرابط العام</th><td><a href="https://substantial-strike-ourselves-gray.trycloudflare.com" target="_blank">https://substantial-strike-ourselves-gray.trycloudflare.com</a></td></tr>
+            <tr><th><span class="emoji">🏠</span> رمز الجذر (Root)</th><td>HTTP 000000</td></tr>
+            <tr><th><span class="emoji">💓</span> رمز الصحة (Health)</th><td>HTTP 000000</td></tr>
+            <tr><th><span class="emoji">🔌</span> المنفذ</th><td>3001</td></tr>
+            <tr><th><span class="emoji">🖥️</span> PID الخادم</th><td>1774</td></tr>
+            <tr><th><span class="emoji">🌐</span> PID النفق</th><td>1794</td></tr>
+            <tr><th><span class="emoji">⏱️</span> مدة التشغيل</th><td>11 ثانية</td></tr>
+            <tr><th><span class="emoji">📂</span> مجلد السجلات</th><td>.autodeploy_logs</td></tr>
+            <tr><th><span class="emoji">⚙️</span> أمر التشغيل</th><td style="font-family: monospace;">npm run start</td></tr>
+        </table>
+        
+        <h3 style="margin-top: 30px; color: #00ff90;"><span class="emoji">🔗</span> روابط سريعة:</h3>
+        <div class="code-block">
+            الصفحة الرئيسية: <a href="https://substantial-strike-ourselves-gray.trycloudflare.com/" target="_blank">https://substantial-strike-ourselves-gray.trycloudflare.com/</a><br>
+            فحص الصحة: <a href="https://substantial-strike-ourselves-gray.trycloudflare.com/health" target="_blank">https://substantial-strike-ourselves-gray.trycloudflare.com/health</a><br>
+            واجهة API: <a href="https://substantial-strike-ourselves-gray.trycloudflare.com/api" target="_blank">https://substantial-strike-ourselves-gray.trycloudflare.com/api</a>
+        </div>
+        
+        <h3 style="margin-top: 30px; color: #00ff90;"><span class="emoji">🧹</span> لإيقاف العمليات:</h3>
+        <div class="code-block">
+            kill 1774 1794
+        </div>
+        
+        <div class="footer">
+            <p>تم إنشاء هذا التقرير تلقائياً بواسطة نظام النشر الذكي</p>
+            <p style="margin-top: 10px; font-size: 0.9em;">Cloudflare TryTunnel Deployment System</p>
+        </div>
+    </div>
+</body>
+</html>

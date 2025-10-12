@@ -1,0 +1,21 @@
+{
+  "status": "SUCCESS",
+  "timestamp": "2025-10-12T18:22:30Z",
+  "uptime_seconds": 11,
+  "port": 3001,
+  "url": "https://substantial-strike-ourselves-gray.trycloudflare.com",
+  "root_path": "/",
+  "health_path": "/health",
+  "root_code": "200",
+  "health_code": "200",
+  "node_pid": 1774,
+  "cloudflared_pid": 1794,
+  "logs_dir": ".autodeploy_logs",
+  "start_command": "npm run start",
+  "verification": {
+    "health_status": "healthy",
+    "services_up": ["web_server", "database", "cache", "file_system"],
+    "pwa_ready": true,
+    "node_version": "v22.20.0"
+  }
+}
