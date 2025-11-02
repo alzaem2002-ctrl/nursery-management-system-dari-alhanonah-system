@@ -1,0 +1,16 @@
+1:"$Sreact.fragment"
+2:I[97367,["/nursery-management-system-dari-alhanonah-system/_next/static/chunks/42879de7b8087bc9.js"],"ViewportBoundary"]
+4:I[97367,["/nursery-management-system-dari-alhanonah-system/_next/static/chunks/42879de7b8087bc9.js"],"MetadataBoundary"]
+5:"$Sreact.suspense"
+7:I[27201,["/nursery-management-system-dari-alhanonah-system/_next/static/chunks/42879de7b8087bc9.js"],"IconMark"]
+:HL["/nursery-management-system-dari-alhanonah-system/_next/static/chunks/10eadbf6512258d7.css","style"]
+:HL["/nursery-management-system-dari-alhanonah-system/_next/static/media/48e6fa8a5baca31f-s.p.33d01b36.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/nursery-management-system-dari-alhanonah-system/_next/static/media/4b676bcffc00356a-s.p.c22aaca1.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/nursery-management-system-dari-alhanonah-system/_next/static/media/7ca057cce9853046-s.p.6a702554.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/nursery-management-system-dari-alhanonah-system/_next/static/media/80c3108817f102b0-s.p.1aa18ac2.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/nursery-management-system-dari-alhanonah-system/_next/static/media/d078e09ad8bf17e2-s.p.90740eef.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/nursery-management-system-dari-alhanonah-system/_next/static/media/d54db18e8cd5f74f-s.p.0e8eb956.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/nursery-management-system-dari-alhanonah-system/_next/static/media/e9f32d51db34fd0c-s.p.28c55982.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+0:{"buildId":"C1uQboFpJl-GKb5ukhr6m","tree":{"name":"","paramType":null,"paramKey":"","hasRuntimePrefetch":false,"slots":{"children":{"name":"__PAGE__","paramType":null,"paramKey":"__PAGE__","hasRuntimePrefetch":false,"slots":null,"isRootLayout":false}},"isRootLayout":true},"head":["$","$1","h",{"children":[null,["$","$L2",null,{"children":"$@3"}],["$","div",null,{"hidden":true,"children":["$","$L4",null,{"children":["$","$5",null,{"name":"Next.Metadata","children":"$@6"}]}]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"isHeadPartial":false,"staleTime":300}
+3:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]
+6:[["$","title","0",{"children":"????? ??????? ??????? ????? ?????? ?????? ???????? - ?????? ???????"}],["$","meta","1",{"name":"description","content":"???? ?????? ?? Canva ??? ?????? ??? Next.js"}],["$","link","2",{"rel":"icon","href":"/nursery-management-system-dari-alhanonah-system/favicon.ico?favicon.0b3bf435.ico","sizes":"256x256","type":"image/x-icon"}],["$","$L7","3",{}]]
